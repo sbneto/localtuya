@@ -94,8 +94,8 @@ GATEWAY_PAYLOAD_DICT = {
 }
 PAYLOAD_DICT = {
     "type_0a": {
-        STATUS: {"hexByte": 0x0A, "command": {"gwId": "", "devId": "", "cid": ""}},
-        SET: {"hexByte": 0x07, "command": {"devId": "", "uid": "", "cid": "", "t": ""}},
+        STATUS: {"hexByte": 0x0A, "command": {"gwId": "", "devId": "", "uid": ""}},
+        SET: {"hexByte": 0x07, "command": {"devId": "", "uid": "", "t": ""}},
         HEARTBEAT: {"hexByte": 0x09, "command": {}},
     },
     "type_0d": {

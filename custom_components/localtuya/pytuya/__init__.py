@@ -85,10 +85,17 @@ HEARTBEAT_INTERVAL = 10
 # prefix: # Next byte is command byte ("hexByte") some zero padding, then length
 # of remaining payload, i.e. command + suffix (unclear if multiple bytes used for
 # length, zero padding implies could be more than one byte)
+GATEWAY_PAYLOAD_DICT = {
+    "type_0a": {
+        STATUS: {"hexByte": 0x0A, "command": {"gwId": "", "devId": "", "cid": ""}},
+        SET: {"hexByte": 0x07, "command": {"cid": "", "t": ""}},
+        HEARTBEAT: {"hexByte": 0x09, "command": {}},
+    },
+}
 PAYLOAD_DICT = {
     "type_0a": {
         STATUS: {"hexByte": 0x0A, "command": {"gwId": "", "devId": "", "cid": ""}},
-        SET: {"hexByte": 0x07, "command": {"devId": "", "uid": "", "t": ""}},
+        SET: {"hexByte": 0x07, "command": {"devId": "", "uid": "", "cid": "", "t": ""}},
         HEARTBEAT: {"hexByte": 0x09, "command": {}},
     },
     "type_0d": {
@@ -329,7 +336,7 @@ class EmptyListener(TuyaListener):
 class TuyaProtocol(asyncio.Protocol, ContextualLogger):
     """Implementation of the Tuya protocol."""
 
-    def __init__(self, dev_id, local_key, protocol_version, on_connected, listener):
+    def __init__(self, dev_id, local_key, protocol_version, client_id, on_connected, listener):
         """
         Initialize a new TuyaInterface.
 
@@ -345,6 +352,7 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
         self.loop = asyncio.get_running_loop()
         self.set_logger(_LOGGER, dev_id)
         self.id = dev_id
+        self.client_id = client_id
         self.local_key = local_key.encode("latin1")
         self.version = protocol_version
         self.dev_type = "type_0a"
@@ -568,7 +576,8 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
             data(dict, optional): The data to be send.
                 This is what will be passed via the 'dps' entry
         """
-        cmd_data = PAYLOAD_DICT[self.dev_type][command]
+        payload_dict = GATEWAY_PAYLOAD_DICT if self.client_id else PAYLOAD_DICT
+        cmd_data = payload_dict[self.dev_type][command]
         json_data = cmd_data["command"]
         command_hb = cmd_data["hexByte"]
 
@@ -579,7 +588,7 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
         if "uid" in json_data:
             json_data["uid"] = self.id  # still use id, no separate uid
         if "cid" in json_data:
-            json_data["cid"] = self.id  # still use id, no separate uid
+            json_data["cid"] = self.client_id  # use client id if provided
         if "t" in json_data:
             json_data["t"] = str(int(time.time()))
 
@@ -627,6 +636,7 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
 async def connect(
     address,
     device_id,
+    client_id,
     local_key,
     protocol_version,
     listener=None,
@@ -641,6 +651,7 @@ async def connect(
             device_id,
             local_key,
             protocol_version,
+            client_id,
             on_connected,
             listener or EmptyListener(),
         ),

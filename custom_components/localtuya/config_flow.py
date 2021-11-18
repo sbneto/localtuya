@@ -14,6 +14,7 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_ID,
     CONF_PLATFORM,
+    CONF_CLIENT_ID,
 )
 from homeassistant.core import callback
 
@@ -43,6 +44,7 @@ BASIC_INFO_SCHEMA = vol.Schema(
         vol.Required(CONF_LOCAL_KEY): str,
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_DEVICE_ID): str,
+        vol.Optional(CONF_CLIENT_ID): str,
         vol.Required(CONF_PROTOCOL_VERSION, default="3.3"): vol.In(["3.1", "3.3"]),
     }
 )
@@ -52,6 +54,7 @@ DEVICE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): cv.string,
         vol.Required(CONF_DEVICE_ID): cv.string,
+        vol.Optional(CONF_CLIENT_ID): cv.string,
         vol.Required(CONF_LOCAL_KEY): cv.string,
         vol.Required(CONF_FRIENDLY_NAME): cv.string,
         vol.Required(CONF_PROTOCOL_VERSION, default="3.3"): vol.In(["3.1", "3.3"]),
@@ -185,6 +188,7 @@ async def validate_input(hass: core.HomeAssistant, data):
         interface = await pytuya.connect(
             data[CONF_HOST],
             data[CONF_DEVICE_ID],
+            data.get(CONF_CLIENT_ID),
             data[CONF_LOCAL_KEY],
             float(data[CONF_PROTOCOL_VERSION]),
         )

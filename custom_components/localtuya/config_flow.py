@@ -473,6 +473,7 @@ class LocalTuyaOptionsFlowHandler(config_entries.OptionsFlow):
                     self.discovered_devices[dev_id]['gwId'] = dev_id
                     # this should be the mac address of the sub device
                     self.discovered_devices[dev_id][CONF_CLIENT_ID] = dev['node_id']
+                    devices[dev_id] = self.discovered_devices[dev_id]["ip"]
 
         return self.async_show_form(
             step_id="add_device",

@@ -263,7 +263,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         platforms = set()
         for dev_id in device_ids:
             entities = entry.data[CONF_DEVICES][dev_id][CONF_ENTITIES]
-            platforms = platforms.union(set(entity[CONF_PLATFORM] for entity in entities))
+            platforms = platforms.union(
+                set(entity[CONF_PLATFORM] for entity in entities)
+            )
             hass.data[DOMAIN][TUYA_DEVICES][dev_id] = TuyaDevice(hass, entry, dev_id)
 
         await asyncio.gather(

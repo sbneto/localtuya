@@ -140,6 +140,12 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
         self._local_key = self._dev_config_entry[CONF_LOCAL_KEY]
         self.set_logger(_LOGGER, self._dev_config_entry[CONF_DEVICE_ID])
 
+        # handling sub-devices
+        self.gateway_device_id = self._dev_config_entry.get(CONF_GATEWAY_DEVICE_ID)
+        self.cid = self._dev_config_entry.get(CONF_CLIENT_ID)
+        self.gateway_device = None
+        self.sub_devices = {}
+
         # This has to be done in case the device type is type_0d
         for entity in self._dev_config_entry[CONF_ENTITIES]:
             self.dps_to_request[entity[CONF_ID]] = None
@@ -149,24 +155,38 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
         """Return if connected to device."""
         return self._interface is not None
 
+    def register_in_gateway(self):
+        self.gateway_device = self._hass.data[DOMAIN][TUYA_DEVICES][self.gateway_device_id]
+        self.gateway_device.sub_devices[self.cid] = self
+
     def async_connect(self):
         """Connect to device if not already connected."""
+        if self.gateway_device:
+            # early return in case this is a sub-device,
+            # connect will be triggered by the gateway
+            return
         if not self._is_closing and self._connect_task is None and not self._interface:
             self._connect_task = asyncio.create_task(self._make_connection())
+
+    async def _get_interface(self):
+        if self.gateway_device:
+            return self.gateway_device._interface
+        else:
+            return await pytuya.connect(
+                self._dev_config_entry[CONF_HOST],
+                self._dev_config_entry.get(CONF_GATEWAY_DEVICE_ID, self._dev_config_entry[CONF_DEVICE_ID]),
+                self._local_key,
+                float(self._dev_config_entry[CONF_PROTOCOL_VERSION]),
+                listener=self,
+                is_gateway=True if self.sub_devices else False,
+            )
 
     async def _make_connection(self):
         """Subscribe localtuya entity events."""
         self.debug("Connecting to %s", self._dev_config_entry[CONF_HOST])
 
         try:
-            self._interface = await pytuya.connect(
-                self._dev_config_entry[CONF_HOST],
-                self._dev_config_entry.get(CONF_GATEWAY_DEVICE_ID, self._dev_config_entry[CONF_DEVICE_ID]),
-                self._local_key,
-                float(self._dev_config_entry[CONF_PROTOCOL_VERSION]),
-                listener=self,
-                is_gateway=True if self._dev_config_entry.get(CONF_CLIENT_ID) else False,
-            )
+            self._interface = await self._get_interface()
             if self._dev_config_entry.get(CONF_CLIENT_ID):
                 self._interface.add_sub_device(self._dev_config_entry[CONF_CLIENT_ID])
 
@@ -221,6 +241,10 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
                 await self._interface.close()
                 self._interface = None
         self._connect_task = None
+
+        # if there are sub-devices, we have to connect them as well
+        for sub_device in self.sub_devices.values():
+            sub_device._connect_task = asyncio.create_task(sub_device._make_connection())
 
     async def update_local_key(self):
         """Retrieve updated local_key from Cloud API and update the config_entry."""
@@ -284,10 +308,8 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
     @callback
     def status_updated(self, status):
         """Device updated status."""
-        cid = self._dev_config_entry.get(CONF_CLIENT_ID)
-        if cid:
-            status = status[cid]
-        self._status.update(status)
+        device = self.cid or '_default'
+        self._status.update(status[device])
         self._dispatch_status()
 
     def _dispatch_status(self):

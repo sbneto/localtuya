@@ -122,7 +122,7 @@ PAYLOAD_DICT = {
         ACTION_UPDATEDPS: {"hexByte": COMMAND_UPDATE_DPS, "command": {"dpId": [18, 19, 20]}},
     },
     DEV_TYPE_0D: {
-        ACTION_STATUS: {"hexByte": COMMAND_DP_QUERY, "command": {"gwId": "", "devId": "", "uid": ""}},
+        ACTION_STATUS: {"hexByte": COMMAND_DP_QUERY_NEW, "command": {"gwId": "", "devId": "", "uid": ""}},
         ACTION_SET: {"hexByte": COMMAND_SET, "command": {"devId": "", "uid": "", "t": ""}},
         ACTION_HEARTBEAT: {"hexByte": COMMAND_HEARTBEAT, "command": {}},
         ACTION_UPDATEDPS: {"hexByte": COMMAND_UPDATE_DPS, "command": {"dpId": [18, 19, 20]}},

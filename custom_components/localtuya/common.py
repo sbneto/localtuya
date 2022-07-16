@@ -142,6 +142,7 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
         self.set_logger(_LOGGER, self.device_id)
 
         # handling sub-devices
+        self._connected = False
         self.gateway_device_id = self._dev_config_entry.get(CONF_GATEWAY_DEVICE_ID)
         self.cid = self._dev_config_entry.get(CONF_CLIENT_ID)
         self.gateway_device = None
@@ -154,7 +155,10 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
     @property
     def connected(self):
         """Return if connected to device."""
-        return self._interface is not None
+        if self.gateway_device:
+            return self._connected
+        else:
+            return self._interface is not None
 
     def register_in_gateway(self):
         self.gateway_device = self._hass.data[DOMAIN][TUYA_DEVICES][self.gateway_device_id]
@@ -162,7 +166,7 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
 
     def async_connect(self):
         """Connect to device if not already connected."""
-        if self.gateway_device:
+        if self.gateway_device and not self.gateway_device.connected:
             # early return in case this is a sub-device,
             # connect will be triggered by the gateway
             return
@@ -199,6 +203,7 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
                 raise Exception("Failed to retrieve status")
 
             self.status_updated(status)
+            self._connected = True
 
             if self._disconnect_task is not None:
                 self._disconnect_task()
@@ -229,17 +234,21 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
             self.exception(
                 f"Connect to {self._dev_config_entry[CONF_HOST]} failed: %s", type(e)
             )
+            self._connected = False
             if self._interface is not None:
-                await self._interface.close()
+                if not self.gateway_device:
+                    await self._interface.close()
                 self._interface = None
 
         except Exception as e:  # pylint: disable=broad-except
             self.exception(f"Connect to {self._dev_config_entry[CONF_HOST]} failed")
+            self._connected = False
             if "json.decode" in str(type(e)):
                 await self.update_local_key()
 
             if self._interface is not None:
-                await self._interface.close()
+                if not self.gateway_device:
+                    await self._interface.close()
                 self._interface = None
         self._connect_task = None
 
@@ -273,10 +282,11 @@ class TuyaDevice(pytuya.TuyaListener, pytuya.ContextualLogger):
         if self._connect_task is not None:
             self._connect_task.cancel()
             await self._connect_task
-        if self._interface is not None:
+        if self._interface is not None and not self.gateway_device:
             await self._interface.close()
         if self._disconnect_task is not None:
             self._disconnect_task()
+        self._connected = False
         self.debug(
             "Closed connection with device %s.",
             self._dev_config_entry[CONF_FRIENDLY_NAME],

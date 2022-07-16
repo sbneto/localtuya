@@ -388,6 +388,12 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
         self.dps_cache = {"_default": {}}
         self.sub_devices = []
 
+    def _parse_cid(self, cid):
+        if cid:
+            if cid not in self.sub_devices:
+                raise Exception("Unexpected sub-device cid", cid)
+        return cid or '_default'
+
     def _setup_dispatcher(self):
         """Sets up message dispatcher for this pytuya instance"""
         return MessageDispatcher(self.id, self._status_update)
@@ -399,7 +405,8 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
 
         listener = self.listener and self.listener()
         if listener is not None:
-            listener.status_updated(self.dps_cache)
+            device = decoded_message.get('cid', '_default')
+            listener.status_updated({device: self.dps_cache[device]})
 
     def connection_made(self, transport):
         """Did connect to the device."""
@@ -504,18 +511,12 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
 
     async def status(self, cid=None):
         """Return device status."""
-        if cid:
-            if cid not in self.sub_devices:
-                raise Exception("Unexpected sub-device cid", cid)
-
-            status = await self.exchange(ACTION_STATUS, cid=cid)
-            if not status:  # Happens when there's an error in decoding
-                return None
-        else:
-            status = await self.exchange(ACTION_STATUS)
-
+        device = self._parse_cid(cid)
+        status = await self.exchange(ACTION_STATUS, cid=cid)
+        if not status:  # Happens when there's an error in decoding
+            return None
         self._update_dps_cache(status)
-        return self.dps_cache
+        return {device: self.dps_cache[device]}
 
     async def heartbeat(self):
         """Send a heartbeat message."""
@@ -550,16 +551,12 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
             value: new value for the dps index
             cid: Client ID of sub-device
         """
-        if cid:
-            if cid not in self.sub_devices:
-                raise Exception("Unexpected sub-device cid", cid)
+        self._parse_cid(cid)
         return await self.exchange(ACTION_SET, {str(dp_index): value}, cid)
 
     async def set_dps(self, dps, cid=None):
         """Set values for a set of datapoints."""
-        if cid:
-            if cid not in self.sub_devices:
-                raise Exception("Unexpected sub-device cid", cid)
+        self._parse_cid(cid)
         return await self.exchange(ACTION_SET, dps, cid)
 
     async def detect_available_dps(self, cid=None):
@@ -569,15 +566,8 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
         # list of available dps experience shows that the dps available are usually
         # in the ranges [1-25] and [100-110] need to split the bruteforcing in
         # different steps due to request payload limitation (max. length = 255)
-
         ranges = [(2, 11), (11, 21), (21, 31), (100, 111)]
-
-        if cid:
-            if cid not in self.sub_devices:
-                raise Exception("Unexpected sub-device cid", cid)
-
-        device = cid or '_default'
-
+        device = self._parse_cid(cid)
         self.dps_cache[device] = {}
 
         for dps_range in ranges:
@@ -598,10 +588,7 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
 
     def add_dps_to_request(self, dp_indicies, cid=None):
         """Add a datapoint (DP) to be included in requests."""
-        if cid:
-            if cid not in self.sub_devices:
-                raise Exception("Unexpected sub-device cid", cid)
-        device = cid or '_default'
+        device = self._parse_cid(cid)
         if isinstance(dp_indicies, int):
             self.dps_to_request[device][str(dp_indicies)] = None
         else:
@@ -745,8 +732,8 @@ class TuyaProtocol(asyncio.Protocol, ContextualLogger):
         """Updates dps status cache"""
         if not status or "dps" not in status:
             return
-        cid = status.get("cid", "_default")
-        self.dps_cache[cid].update(status["dps"])
+        device = status.get("cid", "_default")
+        self.dps_cache[device].update(status["dps"])
 
     def __repr__(self):
         """Return internal string representation of object."""

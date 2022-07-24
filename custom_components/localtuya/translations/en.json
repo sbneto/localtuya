@@ -95,8 +95,9 @@
                     "device_id": "Device ID",
                     "local_key": "Local key",
                     "protocol_version": "Protocol Version",
-                    "scan_interval": "Scan interval (seconds, only when not updating automatically)",
-                    "entities": "Entities (uncheck an entity to remove it)"
+                    "gateway_device_id": "Gateway device ID",
+                    "client_id": "Mac Address of the gateway sub-device",
+                    "scan_interval": "Scan interval (seconds, only when not updating automatically)"
                 }
             },
             "pick_entity_type": {

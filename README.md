@@ -16,6 +16,7 @@ The following Tuya device types are currently supported:
 * Fans
 * Climates
 * Vacuums
+* * Zigbee and Bluetooth gateways and their attached devices
 
 Energy monitoring (voltage, current, watts, etc.) is supported for compatible devices.
 
